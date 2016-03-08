@@ -131,7 +131,7 @@ void detect_circle(Mat& colorgeo, Mat& graygeo_blob, Mat& geometry_graph_bw, vec
 		vector<Point2f> edgePositions;
 		edgePositions = getPointPositions(geometry_graph_bw);
 
-		std::cout << "number of edge positions: " << edgePositions.size() << endl;
+		//std::cout << "number of edge positions: " << edgePositions.size() << endl;
 
 		// create distance transform to efficiently evaluate distance to nearest edge
 		Mat dt;
@@ -173,7 +173,6 @@ void detect_circle(Mat& colorgeo, Mat& graygeo_blob, Mat& geometry_graph_bw, vec
 			//verify or falsify the circle by inlier counting:
 			//float cPerc = verifyCircle(dt,center,radius, inlierSet);
 			float cVal = evaluateCircle(dt, center, radius);
-
 			if (cVal > bestCVal)
 			{
 				bestCVal = cVal;
@@ -183,34 +182,39 @@ void detect_circle(Mat& colorgeo, Mat& graygeo_blob, Mat& geometry_graph_bw, vec
 
 			++nIterations;
 		}
-		std::cout << "current best circle: " << bestCircleCenter << " with radius: " << bestCircleRadius << " and nInlier " << bestCVal << endl;
-		Vec3f circle = { bestCircleCenter.x, bestCircleCenter.y, bestCircleRadius };
-		circles.push_back(circle);
-		//draw the cicle detected in red within the colorgeo blob image
-		cv::circle(colorgeo, bestCircleCenter, bestCircleRadius, Scalar(0, 0, 255));
+		if (bestCVal > 300)
+		{
+			//std::cout << "current best circle: " << bestCircleCenter << " with radius: " << bestCircleRadius << " and nInlier " << bestCVal << endl;
+			Vec3f circle = { bestCircleCenter.x, bestCircleCenter.y, bestCircleRadius };
+			circles.push_back(circle);
+			//draw the cicle detected in red within the colorgeo blob image
+			cv::circle(colorgeo, bestCircleCenter, bestCircleRadius, Scalar(0, 0, 255));
 
-		//TODO: hold and save the detected circle.
+			//TODO: hold and save the detected circle.
 
-		//TODO: instead of overwriting the mask with a drawn circle it might be better to hold and ignore detected circles and dont count new circles which are too close to the old one.
-		// in this current version the chosen radius to overwrite the mask is fixed and might remove parts of other circles too!
+			//TODO: instead of overwriting the mask with a drawn circle it might be better to hold and ignore detected circles and dont count new circles which are too close to the old one.
+			// in this current version the chosen radius to overwrite the mask is fixed and might remove parts of other circles too!
 
-		// update mask: remove the detected circle!
-		cv::circle(geometry_graph_bw, bestCircleCenter, bestCircleRadius, 0, 3); // here the radius is fixed which isnt so nice.
-		cv::circle(graygeo_blob, bestCircleCenter, bestCircleRadius, Scalar(255,255,255), 3);
+			// update mask: remove the detected circle!
+			cv::circle(geometry_graph_bw, bestCircleCenter, bestCircleRadius, 0, 3); // here the radius is fixed which isnt so nice.
+			cv::circle(graygeo_blob, bestCircleCenter, bestCircleRadius, Scalar(255, 255, 255), 3);
+		}
+
 	}
 
 	//namedWindow("edges"); imshow("edges", geometry_graph_bw);
 	//namedWindow("graygeo blob without circles"); imshow("graygeo blob without circles" , graygeo_blob);
-	namedWindow("colorgeo"); cv::imshow("colorgeo", colorgeo);
+	//namedWindow("colorgeo"); cv::imshow("colorgeo", colorgeo);
 }
-
+//void adjust_circle(mavector<Vec4i> circles)
 void detect_circle2(Mat& colorgeo,Mat& graygeo, Mat& geometry_graph_bw, vector<Vec3f>& circles)
 {
 	Mat gray_blured;
 	GaussianBlur(graygeo, gray_blured, Size(7, 7), 2, 2);
 	//apply the hough transfrom  to find the circles
-	HoughCircles(gray_blured, circles, CV_HOUGH_GRADIENT, 1, graygeo.rows / 8, 100, 100, 0, 0);
-	std::cout << circles.size() << endl;
+	HoughCircles(gray_blured, circles, CV_HOUGH_GRADIENT, 1, graygeo.rows / 8, 100, 50, 0, 0);
+	//std::cout << circles.size() << endl;
+	//adjust_circle();
 	// Draw the circles detected
 	for (size_t i = 0; i < circles.size(); i++)
 	{
@@ -218,13 +222,15 @@ void detect_circle2(Mat& colorgeo,Mat& graygeo, Mat& geometry_graph_bw, vector<V
 		int radius = cvRound(circles[i][2]);
 		// circle outline
 		circle(gray_blured, center, radius, Scalar(0, 0, 0), 3, 8, 0);
-		circle(geometry_graph_bw, center, radius, Scalar(0, 0, 0), 10, 8, 0);
-		circle(graygeo, center, radius, Scalar(255, 255, 255), 10, 8, 0);
+		circle(geometry_graph_bw, center, radius, Scalar(0, 0, 0), 3, 8, 0);
+		circle(graygeo, center, radius, Scalar(255, 255, 255), 3, 4, 0);
+		circle(colorgeo, center, radius, Scalar(0, 0, 255), 3, 4, 0);
 	}
 	cv::namedWindow("Hough circle Transform", CV_WINDOW_AUTOSIZE);
 	cv::imshow("Hough circle Transform", gray_blured);
 	cv::namedWindow("after", CV_WINDOW_AUTOSIZE);
 	cv::imshow("after", geometry_graph_bw);
+	cv::imshow("color", colorgeo);
 
 
 }
@@ -288,7 +294,7 @@ void findLineEnds(vector<Vec2i> colpoints, vector<Vec2i>& lineEnds, vector<Vec2i
 	Vec2i pt3 = distance_infos[0].pt1; Vec2i pt4 = distance_infos[0].pt2;
 	lineEnds.push_back(pt3); lineEnds.push_back(pt4);
 	int count0 = 0;
-	cout << "colpoints size " << colpoints.size();
+	//cout << "colpoints size " << colpoints.size();
 	for (vector<Vec2i>::iterator iter3 = colpoints.begin(); iter3 != colpoints.end(); iter3++)
 	{
 		Vec2i tempPt1 = *iter3;
@@ -309,7 +315,7 @@ void findLineEnds(vector<Vec2i> colpoints, vector<Vec2i>& lineEnds, vector<Vec2i
 			}
 		}
 	}
-	cout << " count0 " << count0 << endl;
+	//cout << " count0 " << count0 << endl;
 }
 void detect_lines_endpoints(Mat&colorgeo, Mat& graygeo_blob, Mat& geometry_graph_bw, vector<Vec4i>& lines, vector<spe_point>& points)
 {
@@ -317,9 +323,9 @@ void detect_lines_endpoints(Mat&colorgeo, Mat& graygeo_blob, Mat& geometry_graph
 	//FileStorage fs(".\\geometry_graph_bw.xml", FileStorage::WRITE);
 	//fs << "geometry_graph_bw" << geometry_graph_bw;
 	//fs.release();
-	cv::imshow("test", geometry_graph_bw);
+	//cv::imshow("test", geometry_graph_bw);
 	HoughLinesP(geometry_graph_bw, lines, 1, CV_PI / 180, 30, 30, 10);
-	std::cout << "original pht detected lines is " << lines.size() << endl;
+	//std::cout << "original pht detected lines is " << lines.size() << endl;
 	vector<Vec2i> temp_points;
 	for (size_t i = 0; i < lines.size(); i++)
 	{
@@ -328,22 +334,22 @@ void detect_lines_endpoints(Mat&colorgeo, Mat& graygeo_blob, Mat& geometry_graph
 	}
 	//handle the candidate points from candidate lines
 	std::cout << "The initial size of points is " << temp_points.size() << endl;
-	for (vector<Vec2i>::iterator iter1 = temp_points.begin(); iter1 != temp_points.end(); ++iter1)
-	{
-		Vec2i pt1 = *iter1;
-		for (vector<Vec2i>::iterator iter2 = iter1 + 1; iter2 != temp_points.end(); ++iter2)
-		{
-			if (same_pt(*iter1, *iter2))
-			{
-				temp_points.erase(iter2--);
-			}
-			//else
-			//{
-			//	cv::circle(colorgeo, Point(*iter2), 1, Scalar(255, 0, 0), 5, 8, 0);
-			//}
-		}
-		//cv::circle(colorgeo, Point(pt1[0],pt1[1]), 1, Scalar(255, 0, 0), 5, 8, 0);
-	}
+	//for (vector<Vec2i>::iterator iter1 = temp_points.begin(); iter1 != temp_points.end(); ++iter1)
+	//{
+	//	Vec2i pt1 = *iter1;
+	//	for (vector<Vec2i>::iterator iter2 = iter1 + 1; iter2 != temp_points.end(); ++iter2)
+	//	{
+	//		if (same_pt(*iter1, *iter2))
+	//		{
+	//			temp_points.erase(iter2--);
+	//		}
+	//		//else
+	//		//{
+	//		//	cv::circle(colorgeo, Point(*iter2), 1, Scalar(255, 0, 0), 5, 8, 0);
+	//		//}
+	//	}
+	//	//cv::circle(colorgeo, Point(pt1[0],pt1[1]), 1, Scalar(255, 0, 0), 5, 8, 0);
+	//}
 	std::sort(temp_points.begin(), temp_points.end(), [](Vec2i a, Vec2i b)
 	{
 		if (a[0] != b[0])
@@ -351,11 +357,11 @@ void detect_lines_endpoints(Mat&colorgeo, Mat& graygeo_blob, Mat& geometry_graph
 		else
 			return (a[1] < b[1]);
 	});
-	for (size_t i = 0; i < temp_points.size(); i++)
-	{
-		cout << temp_points[i][0] << " " << temp_points[i][1] << endl;
-	}
-	std::cout << "Now, the size of points is second " << temp_points.size() << endl;
+	//for (size_t i = 0; i < temp_points.size(); i++)
+	//{
+	//	cout << temp_points[i][0] << " " << temp_points[i][1] << endl;
+	//}
+	//std::cout << "Now, the size of points is second " << temp_points.size() << endl;
 	vector<Vec2i> lineEnds; vector<Vec4i> newlines;
 	int count = 0;
 	for (vector<Vec4i>::iterator iter3 = lines.begin(); iter3 != lines.end(); iter3++)
@@ -412,13 +418,13 @@ void detect_lines_endpoints(Mat&colorgeo, Mat& graygeo_blob, Mat& geometry_graph
 			Vec2i pt1 = lineEnds[i];
 			Scalar temp_color = Scalar((rand() & 255), (rand() & 255), (rand() & 255));
 			cv::circle(colorgeo, Point(pt1[0], pt1[1]), 1, temp_color, 5, 8, 0);
-			cout << pt1[0] << " " << pt1[1] << endl;
+			//cout << pt1[0] << " " << pt1[1] << endl;
 		}
 
 	}
-	cout << "count " << count << endl;
-	std::cout << "Now the size of lines is " << lines.size() << endl;
-	std::cout << "Now, the size of points is third " << lineEnds.size() << endl;
+	//cout << "count " << count << endl;
+	//std::cout << "Now the size of lines is " << lines.size() << endl;
+	//std::cout << "Now, the size of points is third " << lineEnds.size() << endl;
 	cv::imshow("points test", colorgeo);
 	//imshow("graygeo blob", graygeo_blob);
 }
