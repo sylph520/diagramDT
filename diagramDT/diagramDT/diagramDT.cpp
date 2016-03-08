@@ -25,11 +25,10 @@ int _tmain(int argc, _TCHAR* argv[])
 	/** first start image processing part **/
 	// read the original image
 	Mat diagram_image = imread(diagram_file, 0);
-	
 	///*test origianl image loading*/
 	//if (diagram_image.empty())
 	//{
-	//	cout << "image load error!" << endl;
+	//	std::cout << "image load error!" << endl;
 	//	return -1;
 	//}
 	//namedWindow("original diagram show for test");
@@ -40,55 +39,71 @@ int _tmain(int argc, _TCHAR* argv[])
 	Mat binarized_image;
 	image_binarizing(diagram_image, binarized_image);
 	//imshow("binarized image", binarized_image); // display the binarized image
-
 	/* image labelling with binarized image */
-	int nlabels; Mat label_matrix, labeled_image;
+	//labeled_image is a color image
+	int nlabels; Mat label_matrix, labeled_image, log_background, background;
 	vector<Mat> segmented_slice, segmented_blob;
 	labeled_image = image_labelling(binarized_image, nlabels, label_matrix, segmented_slice);
-	//namedWindow("color segmented image",1);
 	//imshow("colored segmented image", labeled_image);
-
 	/* image segmenting, find the geometry diagram region and associating labelling letter region */
 	// get the blob information of each labeled region
-	segmenting_blob(segmented_slice, segmented_blob);//image segmenting
-	
+	//segmenting_blob(segmented_slice, segmented_blob);//image segmenting
 	//Here we assume the main geometry graph is of the most number of non-zero pixel
-	sort(segmented_blob.begin(), segmented_blob.end(), nonzero_pixel_number_comp);
-	sort(segmented_slice.begin(), segmented_slice.end(), nonzero_pixel_number_comp);
-	//imshow("test", segmented_slice[0]);
 	
-	Mat colorgeo = diagram_image.mul(segmented_slice[0])+(1-segmented_slice[0])*255;
-	Mat colorgeo_blob = colorgeo(boundingRect(segmented_slice[0]));
-	imshow("test1", colorgeo);
-	imshow("test2", colorgeo_blob);
+	//sort(segmented_blob.begin(), segmented_blob.end(), nonzero_pixel_number_comp);
+	sort(segmented_slice.begin(), segmented_slice.end(), nonzero_pixel_number_comp);
+	//imshow("slice 0", segmented_slice[0]);
+	//imshow("test2", diagram_image.mul(segmented_slice[0] / 255));
+	//gray geo should be small gray number from ori plus the background
+	//background = diagram_image;//initialize
+	//for (size_t i = 1; i < segmented_slice.size(); i++)
+	//{
+	//	background = background - diagram_image.mul(segmented_slice[i]);
+	//}
+	//imshow("test",255*diagram_image.mul(segmented_slice[2]));
+	//cout << segmented_slice[1];
+	//cout << diagram_image.mul(segmented_slice[1]);
+	//imshow("background", background);
+	Mat all_white = 255 * Mat::ones(diagram_image.rows,diagram_image.cols,diagram_image.type());
+	Mat graygeo = diagram_image.mul(segmented_slice[0] / 255) + all_white.mul(255 - segmented_slice[0]);
+	//cout << countNonZero(diagram_image.mul(segmented_slice[0]));
+	//Mat colorgeo_blob; cvtColor(graygeo_blob,colorgeo_blob, CV_GRAY2BGR);
+	//Mat graygeo_blob = graygeo(boundingRect(segmented_slice[0]));
+	
+	//imshow("gray geo", graygeo);
+	//cout << graygeo << endl;
+	//imshow("graygeo blob", graygeo_blob);
 	/*xml save tamplates*/
-	//FileStorage fs(".\\colorgeo.xml", FileStorage::WRITE);
-	//fs << "colorgeo" << colorgeo;
+	//FileStorage fs(".\\graygeo.xml", FileStorage::WRITE);
+	//fs << "graygeo" << graygeo;
 	//fs.release();
 	//namedWindow("ts", 1);
-	//imshow("ts", colorgeo);
+	//imshow("ts", graygeo);
 
-	Mat geometry_graph = segmented_blob[0];
-	//imshow("geometry graph", geometry_graph);
+	Mat geometry_graph_bw = segmented_slice[0];
+	//imshow("geometry graph", geometry_graph_bw);
 	
 	/** now begin primitive detection part **/
-	vector<Vec4i> lines; vector<Vec3f> circles; vector<Vec2i> l_endpoints;
-	vector<Vec2i> crosses; vector<Vec2i> ll_crosses; vector<Vec2i> lc_crosses; vector<Vec2i> joint_corsses;
-	Mat color; cvtColor(geometry_graph, color, CV_GRAY2BGR);
-	Mat nonC_geo;
+	vector<Vec4i> lines; vector<Vec3f> circles; vector<spe_point> points;
+	Mat colorgeo; cvtColor(graygeo, colorgeo, CV_GRAY2BGR);
+	//imshow("original color blob ",colorgeo_blob);
 
 	// head down to bottom detect sequence 
-	parse_primitive(color, colorgeo_blob, geometry_graph, nonC_geo, circles, lines);
+	parse_primitive(colorgeo, graygeo, geometry_graph_bw, circles, lines, points);
 
 	/*imwrite tamplates*/
 	//vector<int> quality;
 	//quality.push_back(CV_IMWRITE_JPEG_QUALITY);
 	//quality.push_back(100);
-	//imwrite("geograph.jpg", geometry_graph,quality );
+	//imwrite("geograph.jpg", geometry_graph_bw,quality );
 	
-	/*xml save tamplates*/
+	/*xml save templates*/
 	//FileStorage fs(".\\geograph.xml", FileStorage::WRITE);
-	//fs << "geograph" << geometry_graph;
+	//fs << "geograph" << geograph;
+	//fs.release();
+	/*xml read templates*/
+	//FileStorage fs(".\\geograph.xml", FileStorage::READ);
+	//Mat geograph; fs["geograph"] >> geograph;
 	//fs.release();
 
 	waitKey(0);
