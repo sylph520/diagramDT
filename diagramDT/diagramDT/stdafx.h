@@ -12,6 +12,7 @@
 #include <iostream>
 #include <opencv.hpp>
 #include <vector>
+#include <string>
 using namespace std;
 using namespace cv;
 
