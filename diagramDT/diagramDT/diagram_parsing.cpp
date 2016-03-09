@@ -272,8 +272,22 @@ struct distance_info
 //
 //	}
 //}
-
-void findLineEnds(vector<Vec2i> colpoints, vector<Vec2i>& lineEnds, vector<Vec2i>& temp_points)
+bool on_other_noncollinearlines(vector<Vec4i> lines,Vec4i temp_line, Vec2i pt)
+{
+	for (size_t i = 0; i < lines.size(); i++)
+	{
+		Vec2i pt1 = { lines[i][0], lines[i][1] }; Vec2i pt2 = { lines[i][2], lines[i][3] };
+		if ((pt == pt1) || (pt == pt2))
+		{
+			if ((!on_line(temp_line, pt1)) || (!on_line(temp_line, pt2)))
+			{
+				return true;
+			}
+		}
+	}
+	return false;
+}
+void findLineEnds(vector<Vec2i> colpoints, vector<Vec2i>& lineEnds, vector<Vec2i>& temp_points, vector<Vec4i> lines)
 {
 	vector<distance_info> distance_infos;
 	for (vector<Vec2i>::iterator iter1 = colpoints.begin(); iter1 != colpoints.end(); iter1++)
@@ -298,10 +312,11 @@ void findLineEnds(vector<Vec2i> colpoints, vector<Vec2i>& lineEnds, vector<Vec2i
 	for (vector<Vec2i>::iterator iter3 = colpoints.begin(); iter3 != colpoints.end(); iter3++)
 	{
 		Vec2i tempPt1 = *iter3;
+		bool flag = on_other_noncollinearlines(lines, { pt3[0], pt3[1], pt4[0], pt4[1] }, tempPt1);
 		for (vector<Vec2i>::iterator iter4 = temp_points.begin(); iter4 != temp_points.end();)
 		{
 			Vec2i tempPt2 = *iter4;
-			if (tempPt2 == tempPt1&&(tempPt2 != pt3)&&(tempPt2 != pt4))
+			if (tempPt2 == tempPt1&&(tempPt2 != pt3)&&(tempPt2 != pt4)&&(!flag))
 			{
 				iter4 = temp_points.erase(iter4);
 				count0++;
@@ -316,6 +331,28 @@ void findLineEnds(vector<Vec2i> colpoints, vector<Vec2i>& lineEnds, vector<Vec2i
 		}
 	}
 	//cout << " count0 " << count0 << endl;
+}
+void erase_pointfrom_set(vector<Vec2i>& set, Vec2i pt)
+{
+	vector<Vec2i>::iterator iter = find(set.begin(), set.end(), pt);
+	if (iter != set.end())
+		set.erase(iter);
+}
+Vec2i to_be_removed_similar_endpoint(Vec2i pt1, Vec2i pt2)
+{
+	Vec2i pt;
+	if (pt1[0] < pt2[0])
+		pt = pt2;
+	else if (pt1[0]>pt2[0])
+		pt = pt1;
+	else if (pt1[1] < pt2[1])
+		pt = pt2;
+	else if (pt1[1] > pt2[1])
+		pt = pt1;
+	else
+		cout << "error" << endl;
+	return pt;
+
 }
 void detect_lines_endpoints(Mat&colorgeo, Mat& graygeo_blob, Mat& geometry_graph_bw, vector<Vec4i>& lines, vector<spe_point>& points)
 {
@@ -398,29 +435,60 @@ void detect_lines_endpoints(Mat&colorgeo, Mat& graygeo_blob, Mat& geometry_graph
 					return (a[1] < b[1]);
 			});
 			tempCollinearPoints.erase(unique(tempCollinearPoints.begin(), tempCollinearPoints.end()), tempCollinearPoints.end());
-			findLineEnds(tempCollinearPoints, lineEnds, temp_points);
-			//size_t tempSize = lineEnds.size();
-			//Vec4i newLine = { lineEnds[tempSize - 2][0], lineEnds[tempSize - 2][1], lineEnds[tempSize - 1][0], lineEnds[tempSize - 1][1] };
-			//newlines.push_back(newLine);
+			findLineEnds(tempCollinearPoints, lineEnds, temp_points,lines);
+			size_t tempSize = lineEnds.size();
+			Vec4i newLine = { lineEnds[tempSize - 2][0], lineEnds[tempSize - 2][1], lineEnds[tempSize - 1][0], lineEnds[tempSize - 1][1] };
+			newlines.push_back(newLine);
 		}
-		std::sort(lineEnds.begin(), lineEnds.end(), [](Vec2i a, Vec2i b)
+	}
+	cout << newlines.size() << endl;
+	std::sort(lineEnds.begin(), lineEnds.end(), [](Vec2i a, Vec2i b)
+	{
+		if (a[0] != b[0])
+			return (a[0] < b[0]);
+		else
+			return (a[1] < b[1]);
+	});
+	lineEnds.erase(unique(lineEnds.begin(), lineEnds.end()), lineEnds.end());
+	//cout << "line end size" << lineEnds.size() << endl;
+	for (size_t i = 0; i < newlines.size(); i++)
+	{
+		Vec2i pt_1 = { newlines[i][0], newlines[i][1] };
+		Vec2i pt_2 = { newlines[i][2], newlines[i][3] };
+		for (size_t j = i + 1; j < newlines.size(); j++)
 		{
-			if (a[0] != b[0])
-				return (a[0] < b[0]);
-			else
-				return (a[1] < b[1]);
-		});
-		lineEnds.erase(unique(lineEnds.begin(), lineEnds.end()), lineEnds.end());
-		//std::cout << "the num of lines now " << lines.size() << endl;
-		//std::cout << endl;
-		for (size_t i = 0; i < lineEnds.size(); i++)
-		{
-			Vec2i pt1 = lineEnds[i];
-			Scalar temp_color = Scalar((rand() & 255), (rand() & 255), (rand() & 255));
-			cv::circle(colorgeo, Point(pt1[0], pt1[1]), 1, temp_color, 5, 8, 0);
-			//cout << pt1[0] << " " << pt1[1] << endl;
+			Vec2i pt_3 = { newlines[j][0], newlines[j][1] };
+			Vec2i pt_4 = { newlines[j][2], newlines[j][3] };
+			if (same_pt(pt_1, pt_3)&&(pt_3 != pt_1))
+			{
+				Vec2i tbrendpt = to_be_removed_similar_endpoint(pt_3, pt_1);
+				erase_pointfrom_set(lineEnds, tbrendpt);
+			}
+			else if (same_pt(pt_3, pt_2)&&(pt_3  != pt_2))
+			{
+				Vec2i tbrendpt = to_be_removed_similar_endpoint(pt_3, pt_2);
+				erase_pointfrom_set(lineEnds, tbrendpt);
+			}
+			else if (same_pt(pt_4, pt_1)&& (pt_4 != pt_1))
+			{
+				Vec2i tbrendpt = to_be_removed_similar_endpoint(pt_4, pt_1);
+				erase_pointfrom_set(lineEnds, tbrendpt);
+			}
+			else if (same_pt(pt_4, pt_2)&&(pt_4 != pt_2))
+			{
+				Vec2i tbrendpt = to_be_removed_similar_endpoint(pt_4, pt_2);
+				erase_pointfrom_set(lineEnds, tbrendpt);
+			}
 		}
-
+	}
+	//std::cout << "the num of lines now " << lines.size() << endl;
+	//std::cout << endl;
+	for (size_t i = 0; i < lineEnds.size(); i++)
+	{
+		Vec2i pt1 = lineEnds[i];
+		Scalar temp_color = Scalar((rand() & 255), (rand() & 255), (rand() & 255));
+		cv::circle(colorgeo, Point(pt1[0], pt1[1]), 1, temp_color, 5, 8, 0);
+		//cout << pt1[0] << " " << pt1[1] << endl;
 	}
 	//cout << "count " << count << endl;
 	//std::cout << "Now the size of lines is " << lines.size() << endl;
