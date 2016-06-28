@@ -36,24 +36,29 @@ bool on_line(Vec4i line, Vec2i pt)
 	else
 		return false;
 }
-int on_circle(Vec2i pt, vector<Vec3f> circles)
+
+int Sgn(double d)
+{
+	if (d<0) 
+		return -1;
+	else 
+		return 1;
+}
+bool on_circle(Vec2i pt, Vec3f circle)
 {
 	// check if the point pt is on one of the circles,or joints of multiple circles, or nothing to do with circles
 	// joint_flag parameter: 0 means not on any circle, 1 means on a circle, 2 means on two circles and so on
 	int dis = 1;// this parameter is to be set to check on the distance tolerants within the distance between radius and distance of pt and circle center point
 	int count = 0;
-	for (size_t i = 0; i < circles.size(); i++)
-	{
-		Vec2f center = (circles[i][0], circles[i][1]);
-		double radius = circles[i][2];
-		double distance = p2pdistance(center, pt);
-		while (distance - radius <= dis)
-		{
-			count++;
-		}
 
-	}
-	return count;
+	Vec2f center = { circle[0], circle[1] };
+	double radius = circle[2];
+	double distance = p2pdistance(center, pt);
+	if (abs(distance - radius) <= dis)
+		return true;
+	else
+		return false;
+
 }
 bool same_pt(Vec2i pt1, Vec2i pt2)
 {
@@ -354,7 +359,7 @@ Vec2i to_be_removed_similar_endpoint(Vec2i pt1, Vec2i pt2)
 	return pt;
 
 }
-void detect_lines_endpoints(Mat&colorgeo, Mat& graygeo_blob, Mat& geometry_graph_bw, vector<Vec4i>& lines, vector<spe_point>& points)
+void detect_lines_endpoints(Mat&colorgeo, Mat& graygeo_blob, Mat& geometry_graph_bw, vector<Vec4i>& lines, vector<Vec2i>& basicEndpoints)
 {
 	//imshow("test", geometry_graph_bw);
 	//FileStorage fs(".\\geometry_graph_bw.xml", FileStorage::WRITE);
@@ -493,7 +498,16 @@ void detect_lines_endpoints(Mat&colorgeo, Mat& graygeo_blob, Mat& geometry_graph
 	//cout << "count " << count << endl;
 	//std::cout << "Now the size of lines is " << lines.size() << endl;
 	//std::cout << "Now, the size of points is third " << lineEnds.size() << endl;
+	for (size_t i = 0; i < newlines.size(); i++)
+	{
+		Vec2i pt1 = { newlines[i][0], newlines[i][1] }; Vec2i pt2 = { newlines[i][2], newlines[i][3] };
+		line(colorgeo, Point(pt1[0], pt1[1]), Point(pt2[0], pt2[1]), Scalar(0, 255, 0), 1, 8, 0);
+	}
 	cv::imshow("points test", colorgeo);
+	lines.clear();
+	lines.assign(newlines.begin(), newlines.end());
+	basicEndpoints.clear();
+	basicEndpoints.assign(lineEnds.begin(), lineEnds.end());
 	//imshow("graygeo blob", graygeo_blob);
 }
 //void detect_lines(Mat& geometry_graph_bw, Mat graygeo_blob, vector<Vec4i>& lines)
@@ -544,60 +558,131 @@ void detect_lines_endpoints(Mat&colorgeo, Mat& graygeo_blob, Mat& geometry_graph
 //	std::cout << "the num of lines now " << lines.size() << endl;
 //}
 
-void c_joint_rec(vector<Vec2i>::iterator iter1, vector<Vec2i>& pts, vector<Vec3f> circles, vector<spe_point> points)
+//void c_joint_rec(vector<Vec2i>::iterator iter1, vector<Vec2i>& pts, vector<Vec3f> circles, vector<spe_point> points)
+//{
+//	// decide whether the point is a joint point and which kind of joints it is 
+//	Vec2i pt = (*iter1);
+//	spe_point spe_pt; Vec3f c = (0, 0, 0);
+//	int flag = on_circle(pt, circles);
+//	spe_pt.pt_location = (pt[0], pt[1]);
+//	string temp;
+//	if (flag == 1)
+//	{
+//		temp = "on_circle";
+//	}
+//	else if (flag != 0)
+//	{
+//		 temp = flag + "_circles_joints";
+//	}
+//	spe_pt.pt_properties.push_back(temp);
+//	for (vector<Vec2i>::iterator iter2 = iter1 + 1; iter2 != pts.end();iter2++)
+//	{
+//		int count = 0;
+//		if (same_pt(pt, *iter2))
+//		{
+//			++count;
+//			iter2 = pts.erase(iter2--);
+//		}	
+//	}
+//
+//	
+//	
+//}
+//void parse_points(vector<Vec4i> lines, vector<Vec3f> circles, vector<spe_point>& points)
+//{
+//	/* this function tend to parse the points with the location and property info in the graph */
+//	// first push the circles center to the points list
+//	for (size_t i = 0; i < circles.size(); i++)
+//	{
+//		spe_point pt; pt.pt_location = (circles[i][0], circles[i][1]); pt.pt_properties.push_back("circle_center");
+//		points.push_back(pt);
+//	}
+//	// then begin to handle other points
+//	vector<Vec2i> tempPointsList;
+//	for (size_t i = 0; i < lines.size(); i++)
+//	{
+//		Vec2i pt1, pt2;
+//		pt1 = (lines[i][0], lines[i][1]);
+//		pt2 = (lines[i][2], lines[i][3]);
+//		tempPointsList.push_back(pt1);
+//		tempPointsList.push_back(pt2);
+//	}
+//	for (vector<Vec2i>::iterator iter1 = tempPointsList.begin(); iter1 != tempPointsList.end();++iter1)
+//	{
+//		c_joint_rec(iter1, tempPointsList, circles, points);
+//	}
+//
+//
+//}
+void allpointsDetect(Mat& colorgeo, vector<Vec3f> circles,vector<Vec4i> lines, vector<Vec2i> basicEndpoint, vector<spe_point> & points)
 {
-	// decide whether the point is a joint point and which kind of joints it is 
-	Vec2i pt = (*iter1);
-	spe_point spe_pt; Vec3f c = (0, 0, 0);
-	int flag = on_circle(pt, circles);
-	spe_pt.pt_location = (pt[0], pt[1]);
-	string temp;
-	if (flag == 1)
-	{
-		temp = "on_circle";
-	}
-	else if (flag != 0)
-	{
-		 temp = flag + "_circles_joints";
-	}
-	spe_pt.pt_properties.push_back(temp);
-	for (vector<Vec2i>::iterator iter2 = iter1 + 1; iter2 != pts.end();iter2++)
-	{
-		int count = 0;
-		if (same_pt(pt, *iter2))
-		{
-			++count;
-			pts.erase(iter2--);
-		}	
-	}
-
-	
-	
-}
-void parse_points(vector<Vec4i> lines, vector<Vec3f> circles, vector<spe_point>& points)
-{
-	/* this function tend to parse the points with the location and property info in the graph */
-	// first push the circles center to the points list
-	for (size_t i = 0; i < circles.size(); i++)
-	{
-		spe_point pt; pt.pt_location = (circles[i][0], circles[i][1]); pt.pt_properties.push_back("circle_center");
-		points.push_back(pt);
-	}
-	// then begin to handle other points
-	vector<Vec2i> tempPointsList;
+	// this function meant to find the line crosses and push back to the points with its properties
+	// this is meant to detect the crosses which is not the end point of line
 	for (size_t i = 0; i < lines.size(); i++)
 	{
-		Vec2i pt1, pt2;
-		pt1 = (lines[i][0], lines[i][1]);
-		pt2 = (lines[i][2], lines[i][3]);
-		tempPointsList.push_back(pt1);
-		tempPointsList.push_back(pt2);
-	}
-	for (vector<Vec2i>::iterator iter1 = tempPointsList.begin(); iter1 != tempPointsList.end();++iter1)
-	{
-		c_joint_rec(iter1, tempPointsList, circles, points);
-	}
+		Vec4i line1 = lines[i];Vec2i pt1 = { line1[0], line1[1] }; Vec2i pt2 = { line1[2], line1[3] };
 
+		for (size_t j = i + 1; j < lines.size(); j++)
+		{
+			Vec4i line2 = lines[j]; Vec2i pt3 = { line2[0], line2[1] }; Vec2i pt4 = { line2[2], line2[3] };
+			float a[2][2] = { { pt2[1] - pt1[1], pt1[0] - pt2[0] }, { pt4[1] - pt3[1], pt3[0] - pt4[0] } };
+			float c[2][1] = { { -pt2[0] * pt1[1] + pt1[0] * pt2[1] }, { -pt4[0] * pt3[1] + pt3[0] * pt4[1] } };
+			Mat src1 = Mat(2, 2, CV_32F, a); Mat src2 = Mat(2, 1, CV_32F, c); Mat dst = Mat(2, 1, CV_32F);
+			//cout << src1 << endl << src2 << endl;
+			// whether the two selected line has cross
+			bool have_line_cross = solve(src1, src2, dst, 0);
+			if (have_line_cross)
+			{
+				Vec2f cross_cal = { dst.at<float>(0, 0), dst.at<float>(1, 0) };
+				//cout << dst << endl;
+				if ((!same_pt(cross_cal, pt1)) && (!same_pt(cross_cal, pt2)) && (!same_pt(cross_cal, pt3)) && (!same_pt(cross_cal, pt4)))
+				{
+					// this means the cross is not the end point of the two lines, so it'll be pushed back to the points
+					Vec2i cross = { cvRound(cross_cal[0]), cvRound(cross_cal[1]) };
+					spe_point crossPt;
+					crossPt.pt_location = cross;
+					crossPt.pt_properties.push_back("not_endpoint");
+					crossPt.on_which_line.push_back(line1); crossPt.on_which_line.push_back(line2);
+					for (size_t k = j + 1; k < lines.size(); k++)
+					{
+						if (on_line(lines[k], cross))
+						{
+							crossPt.on_which_line.push_back(lines[k]);
+						}
+					}
+					bool on_any_circle = false;
+					for (size_t l = 0; l < circles.size(); l++)
+					{
+						if (on_circle(cross, circles[l]))
+						{
+							on_any_circle = true;
+							crossPt.on_which_circle.push_back(circles[l]);
+						}
+					}
+					if (on_any_circle)
+					{
+						crossPt.pt_properties.push_back("line_circle_joint");
+					}
+					points.push_back(crossPt);
+				}
+
+			}
+			else
+			{
+
+			}
+		}
+	}
+	// this is meant to detect cross points of line and circle which is not end point
+	for (size_t i = 0; i < lines.size(); i++)
+	{
+		Vec4i line = lines[i]; Vec2i pt1 = { line[0], line[1] }; Vec2i pt2 = { line[2], line[3] };
+		for (size_t j = 0; j < circles.size(); j++)
+		{
+			Vec3f circle = circles[j]; Vec2f center = { circle[0], circle[1] }; float radius = circle[2];
+			
+		}
+	}
 
 }
 void parse_primitive(Mat &colorgeo, Mat &graygeo_blob, Mat& geometry_graph_bw, vector<Vec3f>& circles, vector<Vec4i>& lines, vector<spe_point>& points)
@@ -605,7 +690,21 @@ void parse_primitive(Mat &colorgeo, Mat &graygeo_blob, Mat& geometry_graph_bw, v
 	/*the function meant to parse the primitives in the geometry graph, here we adopt the strategy to detect from up to bottom*/
 	detect_circle(colorgeo, graygeo_blob, geometry_graph_bw, circles);
 	//detect_circle2(colorgeo, graygeo_blob, geometry_graph_bw, circles);
-	detect_lines_endpoints(colorgeo, graygeo_blob, geometry_graph_bw, lines, points);
+	vector<Vec2i> basicEndpoints;
+	detect_lines_endpoints(colorgeo, graygeo_blob, geometry_graph_bw, lines, basicEndpoints);
+	allpointsDetect(colorgeo, circles, lines, basicEndpoints, points);
+	for (size_t i = 0; i < points.size(); i++)
+	{
+		spe_point pt = points[i];
+		cout << pt.pt_location << endl;
+		for (size_t j = 0; j < pt.pt_properties.size(); j++)
+		{
+			cout << pt.pt_properties[j] << endl;
+		}
+		copy(pt.on_which_line.begin(), pt.on_which_line.end(), ostream_iterator<Vec4i>(cout, " "));
+		
+		
+	}
 	
 
 
